@@ -51,5 +51,6 @@ that is modded (invalid runs).
 3. Start TUNIC with the Replay BepInEx plugin (follow instruction on the plugin).
 4. When you start a New Game or load a NG+ Game, you should see a "ghost"
    following the path of the replay.
+5. Happy learning!
 
 It is not necessary to have LiveSplit running.
