@@ -14,6 +14,7 @@ namespace TunicReplayPlugin
         private const string LoadingSceneName = "Loading";
         private const string SaveSceneIndexesKey = "Tunic Replay Scene Indexes";
         private const string SavePlayTimeKey = "playtime";
+        private const float GhostScale = 0.75f;
 
         private ReplayDatabase replayDatabase;
         private string lastSceneName = String.Empty;
@@ -97,28 +98,43 @@ namespace TunicReplayPlugin
                 return null;
             }
 
-            var ghostGameObject = new GameObject($"Replay Ghost #{player}");
+            var lureGameObject = lurePrefab.gameObject;
+            
+            // Deactivate the lure prefab so that the instantiated ghost is initially deactivated
+            var lureActive = lureGameObject.activeSelf;
+            lureGameObject.SetActive(false);
 
-            var skeletonGameObject = Instantiate(lurePrefab.transform.Find("Fox"), ghostGameObject.transform);
-            skeletonGameObject.name = "Fox";
+            var ghostGameObject = Instantiate(lureGameObject);
+            ghostGameObject.name = $"Replay Ghost #{player}";
+            ghostGameObject.transform.localScale = new Vector3(GhostScale, GhostScale, GhostScale);
 
-            var meshGameObject = Instantiate(lurePrefab.transform.Find("fox"), ghostGameObject.transform);
-            meshGameObject.name = "fox";
+            lureGameObject.SetActive(lureActive);
 
-            var renderer = meshGameObject.GetComponent<SkinnedMeshRenderer>();
-            renderer.rootBone = ghostGameObject.transform.Find(GetRelativePath(renderer.rootBone, lurePrefab.transform));
-
-            var newBones = new Il2CppReferenceArray<Transform>(renderer.bones.Count);
-            for (int i = 0; i < renderer.bones.Count; ++i)
+            foreach (var child in ghostGameObject.GetComponents<Component>())
             {
-                if (renderer.bones[i] != null)
+                var childType = child.GetIl2CppType();
+                if (childType != UnhollowerRuntimeLib.Il2CppType.Of<Animator>() &&
+                    childType != UnhollowerRuntimeLib.Il2CppType.Of<Transform>())
                 {
-                    newBones[i] = ghostGameObject.transform.Find(GetRelativePath(renderer.bones[i], lurePrefab.transform));
+                    Logger.LogInfo("Destroying " + childType.Name + " on ghost");
+                    Destroy(child);
                 }
             }
-            renderer.bones = newBones;
 
             // TODO: Randomize player colors
+
+            ghostGameObject.SetActive(true);
+
+            // Destroy FMOD behaviors so that it doesn't play the running sound
+            // This can only be done when the game object is active, otherwise GetBehaviours doesn't return any behaviors
+            foreach (var behavior in ghostGameObject.GetComponent<Animator>().GetBehaviours<StateMachineBehaviour>())
+            {
+                if (behavior.GetIl2CppType() == UnhollowerRuntimeLib.Il2CppType.Of<FMODAnimationStateBehaviour>())
+                {
+                    Logger.LogInfo("Destroying " + behavior.GetIl2CppType().Name + " on ghost animator");
+                    Destroy(behavior);
+                }
+            }
 
             return ghostGameObject;
         }
