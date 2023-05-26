@@ -10,6 +10,8 @@ startup
 	
 	string[,] _settings =
 	{
+		{ null, "recordReplay", "Record replay" },
+
 		{ null, "Key Items", "Key Items" },
 			{ "Key Items", "inventory quantity Wand : 1",                                          "Magic Orb" },
 			{ "Key Items", "inventory quantity Techbow : 1",                                       "Fire Wand" },
@@ -374,13 +376,16 @@ onStart
 		vars.replayFile = null;
 	}
 
-	var replaysPath = Environment.ExpandEnvironmentVariables(@"%USERPROFILE%\Desktop\TunicReplays\");
-	Directory.CreateDirectory(replaysPath);
-	
-	var replayTs = DateTime.UtcNow.ToString("yyyy-MM-ddTHH-mm-ssZ", System.Globalization.CultureInfo.InvariantCulture);
-	vars.replayFile = new BinaryWriter(File.Create(Path.Combine(replaysPath, "tunic-replay-" + replayTs + ".trp")));
-	vars.replayFile.Write(0x00001000); // Version header
-	vars.replaySceneIndex = -1;
+	if (settings["recordReplay"])
+	{
+		var replaysPath = Environment.ExpandEnvironmentVariables(@"%USERPROFILE%\Desktop\TunicReplays\");
+		Directory.CreateDirectory(replaysPath);
+		
+		var replayTs = DateTime.UtcNow.ToString("yyyy-MM-ddTHH-mm-ssZ", System.Globalization.CultureInfo.InvariantCulture);
+		vars.replayFile = new BinaryWriter(File.Create(Path.Combine(replaysPath, "tunic-replay-" + replayTs + ".trp")));
+		vars.replayFile.Write(0x00001000); // Version header
+		vars.replaySceneIndex = -1;
+	}
 }
 
 split
