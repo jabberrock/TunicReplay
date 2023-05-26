@@ -6,13 +6,24 @@ namespace TunicReplayPlugin
 {
     internal class Replay
     {
-        private readonly List<ReplaySegment> segments;
-
         public Replay(int player, string replayPath)
         {
-            this.segments = LoadReplaySegments(player, replayPath);
+            this.Player = player; 
+            this.Segments = new List<ReplaySegment>();
+            this.Instants = new List<ReplayInstant>();
 
-            Logger.LogInfo("Loaded replay at " + replayPath + " with " + this.segments.Count + " segments");
+            LoadReplay(player, replayPath);
+
+            Logger.LogInfo("Loaded replay at " + replayPath + " with " + this.Segments.Count + " segments");
+        }
+
+        public int Player { get; private set; }
+        public List<ReplaySegment> Segments { get; private set; }
+        public List<ReplayInstant> Instants { get; private set; }
+
+        public ReplayInstant AtTime(float replayGameTime)
+        {
+            return ReplayInstant.Interpolate(replayGameTime, this.Instants);
         }
 
         public ReplaySegment GetSegment(List<int> sceneIndexes)
@@ -25,26 +36,24 @@ namespace TunicReplayPlugin
                 // Allow runner to load into an area more times that the replay
                 // TODO: Allow runner to load into an area fewer times than the replay
                 // TODO: Wrong warp forces you to enter and exit an area multiple times... how?
-                if (nextSegmentIndex < this.segments.Count
-                    && this.segments[nextSegmentIndex].SceneIndex == sceneIndex)
+                if (nextSegmentIndex < this.Segments.Count
+                    && this.Segments[nextSegmentIndex].SceneIndex == sceneIndex)
                 {
                     segmentIndex = nextSegmentIndex;
                 }
             }
 
             // Make sure the segment matches the final requested scene
-            if (segmentIndex >= 0 && this.segments[segmentIndex].SceneIndex == sceneIndexes[sceneIndexes.Count - 1])
+            if (segmentIndex >= 0 && this.Segments[segmentIndex].SceneIndex == sceneIndexes[sceneIndexes.Count - 1])
             {
-                return this.segments[segmentIndex];
+                return this.Segments[segmentIndex];
             }
 
             return null;
         }
 
-        private static List<ReplaySegment> LoadReplaySegments(int player, string replayPath)
+        private void LoadReplay(int player, string replayPath)
         {
-            var segments = new List<ReplaySegment>();
-
             using (var binaryReader = new BinaryReader(File.OpenRead(replayPath)))
             {
                 var versionHeader = binaryReader.ReadUInt32();
@@ -61,22 +70,31 @@ namespace TunicReplayPlugin
                         switch (marker)
                         {
                             case 0xDEADBEEF:
-                                var sceneIndex = binaryReader.ReadInt32();
-                                var startGameTime = binaryReader.ReadSingle();
-
-                                var segment = new ReplaySegment()
                                 {
-                                    Player = player,
-                                    SceneIndex = sceneIndex,
-                                    StartReplayGameTime = startGameTime
-                                };
-                                segments.Add(segment);
+                                    var sceneIndex = binaryReader.ReadInt32();
+                                    var startGameTime = binaryReader.ReadSingle();
 
+                                    var segment = new ReplaySegment()
+                                    {
+                                        Player = player,
+                                        SceneIndex = sceneIndex,
+                                        StartReplayGameTime = startGameTime
+                                    };
+
+                                    if (this.Segments.Count > 0)
+                                    {
+                                        this.Segments[this.Segments.Count - 1].NextSegment = segment;
+                                    }
+
+                                    this.Segments.Add(segment);
+                                }
                                 break;
 
                             case 0xCAFED00D:
-                                if (segments.Count > 0)
+                                if (this.Segments.Count > 0)
                                 {
+                                    var segment = this.Segments[this.Segments.Count - 1];
+
                                     var gameTime = binaryReader.ReadSingle();
                                     var px = binaryReader.ReadSingle();
                                     var py = binaryReader.ReadSingle();
@@ -89,11 +107,13 @@ namespace TunicReplayPlugin
                                     var instant = new ReplayInstant()
                                     {
                                         Player = player,
+                                        SceneIndex = segment.SceneIndex,
                                         ReplayGameTime = gameTime,
                                         Position = new Vector3(px, py, pz),
                                         Rotation = new Quaternion(rx, ry, rz, rw)
                                     };
-                                    segments[segments.Count - 1].Instants.Add(instant);
+                                    segment.Instants.Add(instant);
+                                    this.Instants.Add(instant);
                                 }
                                 break;
 
@@ -107,8 +127,6 @@ namespace TunicReplayPlugin
                     }
                 }
             }
-
-            return segments;
         }
     }
 }

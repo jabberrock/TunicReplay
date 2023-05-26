@@ -5,54 +5,109 @@ namespace TunicReplayPlugin
 {
     internal class ReplayDatabase
     {
+        public static ReplayDatabase Instance { get; set; }
+
         private const string ReplayFilePattern = "*.trp";
 
         private readonly string replaysDir;
         private readonly List<Replay> replays;
 
-        private List<ReplaySegment> segments;
+        private List<int> sceneIndexes;
         private float segmentStartGameTime;
 
         public ReplayDatabase(string replaysDir)
         {
             this.replaysDir = replaysDir;
             this.replays = new List<Replay>();
+            this.Mode = ReplayMode.BestTimeInSegment;
         }
 
-        public void JumpToSegment(List<int> sceneIndexes, float gameTime)
+        public enum ReplayMode
         {
-            this.segments = new List<ReplaySegment>();
-            this.segmentStartGameTime = 0.0f;
+            TimeInGame,
+            TimeInSegment,
+            BestTimeInSegment
+        }
 
+        public ReplayMode Mode { get; set; }
+
+        public void BeginSegment(List<int> sceneIndexes, float gameTime)
+        {
+            this.sceneIndexes = sceneIndexes;
+            this.segmentStartGameTime = gameTime;
+        }
+
+        public List<ReplayInstant> AtTime(int sceneIndex, float gameTime)
+        {
+            var instants = new List<ReplayInstant>();
+            switch (this.Mode)
+            {
+                case ReplayMode.TimeInGame:
+
+                    foreach (var replay in this.replays)
+                    {
+                        var instant = replay.AtTime(gameTime);
+                        if (instant != null)
+                        {
+                            instants.Add(instant);
+                        }
+                    }
+
+                    break;
+
+                case ReplayMode.TimeInSegment:
+                    GetInstantsAtSegment(gameTime, instants);
+                    break;
+
+                case ReplayMode.BestTimeInSegment:
+
+                    ReplaySegment bestCompleteSegment = null;
+                    foreach (var replay in this.replays)
+                    {
+                        var segment = replay.GetSegment(sceneIndexes);
+                        if (segment != null && segment.NextSegment != null &&
+                            (bestCompleteSegment == null || segment.Duration < bestCompleteSegment.Duration))
+                        {
+                            bestCompleteSegment = segment;
+                        }
+                    }
+
+                    if (bestCompleteSegment != null)
+                    {
+                        var instant = bestCompleteSegment.AtTime(gameTime - this.segmentStartGameTime);
+                        if (instant != null)
+                        {
+                            instants.Add(instant);
+                        }
+                    }
+                    else
+                    {
+                        // Couldn't find a complete segment, so show all segments
+                        GetInstantsAtSegment(gameTime, instants);
+                    }
+
+                    break;
+            }
+
+            instants.RemoveAll(instant => instant.SceneIndex != sceneIndex);
+
+            return instants;
+        }
+
+        private void GetInstantsAtSegment(float gameTime, List<ReplayInstant> instants)
+        {
             foreach (var replay in this.replays)
             {
                 var segment = replay.GetSegment(sceneIndexes);
                 if (segment != null)
                 {
-                    this.segments.Add(segment);
+                    var instant = segment.AtTime(gameTime - this.segmentStartGameTime);
+                    if (instant != null)
+                    {
+                        instants.Add(instant);
+                    }
                 }
             }
-
-            this.segmentStartGameTime = gameTime;
-
-            Logger.LogInfo("Jump to segment " + string.Join(",", sceneIndexes) + " at game time " + gameTime + " found " + this.segments.Count + " segments");
-        }
-
-        public List<ReplayInstant> At(float gameTime)
-        {
-            var instants = new List<ReplayInstant>();
-            foreach (var segment in this.segments)
-            {
-                var instant = segment.Interpolate(gameTime - segmentStartGameTime);
-                if (instant != null)
-                {
-                    instants.Add(instant);
-                }
-            }
-
-            // Logger.LogInfo("Found " + instants.Count + " instants at " + gameTime);
-
-            return instants;
         }
 
         public void LoadReplays()

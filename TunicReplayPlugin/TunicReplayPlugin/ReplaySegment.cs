@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using UnityEngine;
 
 namespace TunicReplayPlugin
 {
@@ -8,47 +7,28 @@ namespace TunicReplayPlugin
         public int Player { get; set; }
         public int SceneIndex { get; set; }
         public float StartReplayGameTime { get; set; }
+        public ReplaySegment NextSegment { get; set; }
 
         public List<ReplayInstant> Instants = new List<ReplayInstant>();
 
-        public ReplayInstant Interpolate(float gameTimeInSegment)
+        public float Duration
         {
-            if (this.Instants.Count == 0)
+            get
             {
-                return null;
-            }
-
-            var replayGameTime = gameTimeInSegment + this.StartReplayGameTime;
-
-            var searchIndex = this.Instants.BinarySearch(new ReplayInstant() { ReplayGameTime = replayGameTime });
-            if (searchIndex >= 0)
-            {
-                return this.Instants[searchIndex];
-            }
-
-            var nextIndex = ~searchIndex;
-            if (nextIndex == 0)
-            {
-                return this.Instants[0];
-            }
-            else if (nextIndex == this.Instants.Count)
-            {
-                return this.Instants[this.Instants.Count - 1];
-            }
-            else
-            {
-                var previous = this.Instants[nextIndex - 1];
-                var next = this.Instants[nextIndex];
-                var t = (replayGameTime - previous.ReplayGameTime) / (next.ReplayGameTime - previous.ReplayGameTime);
-
-                return new ReplayInstant()
+                if (this.Instants.Count > 0)
                 {
-                    Player = this.Player,
-                    ReplayGameTime = gameTimeInSegment + this.StartReplayGameTime,
-                    Position = Vector3.Slerp(previous.Position, next.Position, t),
-                    Rotation = Quaternion.Slerp(previous.Rotation, next.Rotation, t)
-                };
+                    return this.Instants[this.Instants.Count - 1].ReplayGameTime - this.StartReplayGameTime;
+                }
+                else
+                {
+                    return float.MaxValue;
+                }
             }
+        }
+
+        public ReplayInstant AtTime(float segmentGameTime)
+        {
+            return ReplayInstant.Interpolate(segmentGameTime + this.StartReplayGameTime, this.Instants);
         }
     }
 }

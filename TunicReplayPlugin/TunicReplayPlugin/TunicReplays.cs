@@ -15,13 +15,19 @@ namespace TunicReplayPlugin
 
             Logger.LogInfo("Loading plugin...");
 
-            Application.runInBackground = true;
+            // Application.runInBackground = true;
 
             ClassInjector.RegisterTypeInIl2Cpp<TunicReplaysController>();
 
             var tunicReplays = new GameObject("Tunic Replay") { hideFlags = HideFlags.HideAndDontSave };
             tunicReplays.AddComponent<TunicReplaysController>();
             GameObject.DontDestroyOnLoad(tunicReplays);
+
+            ClassInjector.RegisterTypeInIl2Cpp<ReplaySettings>();
+
+            var replaySettings = new GameObject("Tunic Replay Settings") { hideFlags = HideFlags.HideAndDontSave };
+            replaySettings.AddComponent<ReplaySettings>();
+            GameObject.DontDestroyOnLoad(replaySettings);
 
             Logger.LogInfo("Plugin loaded");
         }

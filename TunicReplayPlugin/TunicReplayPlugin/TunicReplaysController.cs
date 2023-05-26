@@ -16,15 +16,13 @@ namespace TunicReplayPlugin
         private const string SavePlayTimeKey = "playtime";
         private const float GhostScale = 0.75f;
 
-        private ReplayDatabase replayDatabase;
         private string lastSceneName = String.Empty;
 
-        private Dictionary<int, GameObject> playerGameObjects = new Dictionary<int, GameObject>();
+        private Dictionary<int, GameObject> ghostGameObjects = new Dictionary<int, GameObject>();
 
         public void Start()
         {
-            this.replayDatabase =
-                new ReplayDatabase(Environment.ExpandEnvironmentVariables(TunicReplaysDir));
+            ReplayDatabase.Instance = new ReplayDatabase(Environment.ExpandEnvironmentVariables(TunicReplaysDir));
         }
 
         public void Update()
@@ -38,14 +36,14 @@ namespace TunicReplayPlugin
             if (this.lastSceneName != scene.name)
             {
                 Logger.LogInfo($"Switching scenes from {this.lastSceneName} -> {scene.name}".ToString());
-                this.playerGameObjects.Clear();
+                this.ghostGameObjects.Clear();
 
                 // TODO: Do we skip if we're returning to the title screen from in game?
                 // TODO: Don't reload replays that are already loaded
                 // TODO: Listen for new replays and try to load them
                 if (scene.name == TitleScreenSceneName)
                 {
-                    this.replayDatabase.LoadReplays();
+                    ReplayDatabase.Instance.LoadReplays();
                 }
                 
                 if (this.lastSceneName == LoadingSceneName && scene.name != TitleScreenSceneName)
@@ -64,7 +62,7 @@ namespace TunicReplayPlugin
                     sceneIndexes.Add(scene.buildIndex);
                     SaveFile.SetString(SaveSceneIndexesKey, string.Join(",", sceneIndexes));
 
-                    this.replayDatabase.JumpToSegment(sceneIndexes, SaveFile.GetFloat(SavePlayTimeKey));
+                    ReplayDatabase.Instance.BeginSegment(sceneIndexes, SaveFile.GetFloat(SavePlayTimeKey));
                 }
             }
 
@@ -72,17 +70,29 @@ namespace TunicReplayPlugin
 
             if (SpeedrunData.timerRunning)
             {
-                var replayInstants = this.replayDatabase.At(SpeedrunData.inGameTime);
+                // HACK: Only allow creating one ghost per update. For some
+                // reason, creating more than one ghost in a single update
+                // causes the walking sound effect to stay around.
+                bool newGhostCreated = false;
+
+                var replayInstants = ReplayDatabase.Instance.AtTime(scene.buildIndex, SpeedrunData.inGameTime);
                 foreach (var replayInstant in replayInstants)
                 {
-                    GameObject playerGameObject;
-                    if (!this.playerGameObjects.TryGetValue(replayInstant.Player, out playerGameObject))
+                    GameObject ghostGameObject;
+                    if (!this.ghostGameObjects.TryGetValue(replayInstant.Player, out ghostGameObject))
                     {
-                        playerGameObject = CreatePlayer(replayInstant.Player);
-                        this.playerGameObjects[replayInstant.Player] = playerGameObject;
+                        if (!newGhostCreated)
+                        {
+                            ghostGameObject = CreatePlayer(replayInstant.Player);
+                            this.ghostGameObjects[replayInstant.Player] = ghostGameObject;
+                            newGhostCreated = true;
+                        }
                     }
 
-                    playerGameObject.transform.SetPositionAndRotation(replayInstant.Position, replayInstant.Rotation);
+                    if (ghostGameObject != null)
+                    {
+                        ghostGameObject.transform.SetPositionAndRotation(replayInstant.Position, replayInstant.Rotation);
+                    }
                 }
             }
         }
@@ -129,7 +139,7 @@ namespace TunicReplayPlugin
             // This can only be done when the game object is active, otherwise GetBehaviours doesn't return any behaviors
             foreach (var behavior in ghostGameObject.GetComponent<Animator>().GetBehaviours<StateMachineBehaviour>())
             {
-                if (behavior.GetIl2CppType() == UnhollowerRuntimeLib.Il2CppType.Of<FMODAnimationStateBehaviour>())
+                //if (behavior.GetIl2CppType() == UnhollowerRuntimeLib.Il2CppType.Of<FMODAnimationStateBehaviour>())
                 {
                     Logger.LogInfo("Destroying " + behavior.GetIl2CppType().Name + " on ghost animator");
                     Destroy(behavior);
