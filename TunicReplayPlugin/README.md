@@ -15,11 +15,15 @@ This is a BepInEx plugin that replays a Tunic replay file (.trp).
     - Copy it into `BepInEx/plugins` under your game's install directory
     - Launch Tunic again and you should see a small options window on the title screen!
 
+![Title Screen](https://github.com/jabberrock/TunicReplay/assets/130935387/8651ef09-bb25-492d-b72c-3a90828afac2)
+
 ## Add Tunic Replay files
 
 1. Create a `TunicReplays` folder on your Desktop
 2. Copy one or more `.trp` file into the `TunicReplays` folder
     - Example files can be found at https://github.com/jabberrock/TunicReplayUploads. Click the "Download raw file" button to download a file.
+
+![TunicReplays on Desktop](https://github.com/jabberrock/TunicReplay/assets/130935387/81a53629-076f-43fc-bff8-d55f1b95f9fe)
 
 ## Play against a Replay
 
@@ -28,6 +32,8 @@ This is a BepInEx plugin that replays a Tunic replay file (.trp).
     - Game Time - the ghost follows the original recorded run
     - Segment Time - the ghost waits for you at every save/load point
     - Best Segment Time - the ghost picks the best segment across all replay files
+
+![Racing against a replay](https://github.com/jabberrock/TunicReplay/assets/130935387/2e4a38b8-1242-4c0b-9560-0f8a6ab04c7a)
 
 ## Uninstall
 
